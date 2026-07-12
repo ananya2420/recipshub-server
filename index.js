@@ -27,79 +27,98 @@ async function run() {
     });
 
    app.get("/recips", async (req, res) => {
-
         try {
-
-            const { search, page, perPage } = req.query;
-
+            const { search, page, perPage, userId } = req.query;
             const query = {};
 
-
+            if (userId) {
+                query.userId = userId;
+            }
 
             if (search && search !== "undefined") {
-
                 query.$or = [
-
-                    { title: { $regex: search, $options: 'i' } },
-
+                    { name: { $regex: search, $options: 'i' } },
                     { description: { $regex: search, $options: 'i' } }
-
                 ];
-
             }
-
-
 
             if (page) {
-
                 const pageNum = parseInt(page) || 1;
-
                 const limitNum = parseInt(perPage) || 10;
-
                 const recipes = await recipeCollection
-
                     .find(query)
-
                     .skip((pageNum - 1) * limitNum)
-
                     .limit(limitNum)
-
                     .toArray();
-
-               
-
                 return res.send(recipes);
-
             }
 
-
-
             const result = await recipeCollection.find(query).toArray();
-
             res.send(result);
-
         } catch (dbError) {
-
             console.error("Database query error:", dbError);
-
             res.status(500).send("Error fetching data");
-
         }
-
     });
 
 
-    app.get("/recipe/:id", async (req, res) => {
+    app.post("/api/recips", async (req, res) => {
         try {
-            if (!ObjectId.isValid(req.params.id)) {
-                return res.status(400).send({ message: "Invalid ID format" });
+            const newRecipe = req.body;
+            // Ensure fields match your form: name, category, cuisineType, difficultyLevel, 
+            // preparationTime, ingredients, instructions, image, userId
+            const result = await recipeCollection.insertOne(newRecipe);
+            res.status(201).send({ insertedId: result.insertedId });
+        } catch (err) {
+            console.error("Error inserting recipe:", err);
+            res.status(500).send({ message: "Failed to create recipe" });
+        }
+    });
+    
+    app.get("/recipe/:id", async (req, res) => {
+    try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const recipe = await recipeCollection.findOne(query);
+
+        if (!recipe) {
+            return res.status(404).send({ message: "Recipe not found" });
+        }
+        res.send(recipe);
+    } catch (err) {
+        console.error("Error fetching recipe:", err);
+        res.status(500).send({ message: "Server error" });
+    }
+});
+
+
+
+    app.patch("/recipe/:id", async (req, res) => {
+        try {
+            const id = req.params.id;
+            const updateData = req.body;
+            const result = await recipeCollection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: updateData }
+            );
+            
+            if (result.matchedCount === 0) {
+                return res.status(404).send({ message: "Recipe not found" });
             }
-            const result = await recipeCollection.findOne({ _id: new ObjectId(req.params.id) });
-            result ? res.send(result) : res.status(404).send({ message: "Recipe not found" });
+            res.send({ message: "Recipe updated successfully" });
         } catch (err) {
             res.status(500).send({ message: "Server error" });
         }
     });
+
+//recipe related apis
+
+    app.post("/recips", async (req, res) => {
+          const recipe=req.body;
+          const result=await recipeCollection.insertOne(recipe);
+          res.send(result);
+    })
+
 
     app.listen(port, () => {
       console.log(`Server running on port ${port}`);
@@ -110,3 +129,6 @@ async function run() {
 }
 
 run();
+
+
+//git rm --cached .env
