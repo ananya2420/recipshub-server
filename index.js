@@ -111,6 +111,36 @@ async function run() {
         }
     });
 
+    // Inside your server.js
+app.post("/api/payments", async (req, res) => {
+    try {
+        const { recipeId, title, price, userId } = req.body;
+        
+        // Save to a "purchases" collection in MongoDB
+        const purchaseCollection = client.db("recipeshub_db").collection("purchases");
+        
+        const result = await purchaseCollection.insertOne({
+            userId,      // Link purchase to the specific user
+            recipeId,
+            title,
+            amountPaid: price,
+            date: new Date().toLocaleDateString() // e.g., 16/06/2026
+        });
+        
+        res.status(201).send(result);
+    } catch (err) {
+        res.status(500).send({ message: "Failed to save purchase" });
+    }
+});
+
+
+  // Inside your server.js
+app.get("/api/purchases/:userId", async (req, res) => {
+    const purchaseCollection = client.db("recipeshub_db").collection("purchases");
+    const purchases = await purchaseCollection.find({ userId: req.params.userId }).toArray();
+    res.send(purchases);
+});
+
 //recipe related apis
 
     app.post("/recips", async (req, res) => {
@@ -119,6 +149,44 @@ async function run() {
           res.send(result);
     })
 
+
+// --- Favorites API Routes ---
+
+    // 1. Add to Favorites
+    app.post("/api/favorites", async (req, res) => {
+        try {
+            const favoriteCollection = client.db("recipeshub_db").collection("favorites");
+            const result = await favoriteCollection.insertOne(req.body);
+            res.status(201).send(result);
+        } catch (err) {
+            res.status(500).send({ message: "Failed to add to favorites" });
+        }
+    });
+
+    // 2. Get Favorites for a User
+    app.get("/api/favorites/:userId", async (req, res) => {
+        try {
+            const favoriteCollection = client.db("recipeshub_db").collection("favorites");
+            const favorites = await favoriteCollection.find({ userId: req.params.userId }).toArray();
+            res.send(favorites);
+        } catch (err) {
+            res.status(500).send({ message: "Failed to fetch favorites" });
+        }
+    });
+
+    // 3. Remove from Favorites
+    app.delete("/api/favorites/:userId/:recipeId", async (req, res) => {
+        try {
+            const favoriteCollection = client.db("recipeshub_db").collection("favorites");
+            const result = await favoriteCollection.deleteOne({ 
+                userId: req.params.userId, 
+                recipeId: req.params.recipeId 
+            });
+            res.send(result);
+        } catch (err) {
+            res.status(500).send({ message: "Failed to remove from favorites" });
+        }
+    });
 
     app.listen(port, () => {
       console.log(`Server running on port ${port}`);
