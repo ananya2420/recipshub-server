@@ -188,6 +188,37 @@ app.get("/api/purchases/:userId", async (req, res) => {
         }
     });
 
+
+    // Add this route to record payments in your "payments" collection
+app.post("/api/save-payment", async (req, res) => {
+    try {
+        const { sessionId, userId, email, amount, status } = req.body;
+
+        const paymentCollection = client.db("recipeshub_db").collection("payments");
+
+        // Check if this payment already exists to prevent duplicates
+        const existing = await paymentCollection.findOne({ sessionId: sessionId });
+
+        if (!existing) {
+            await paymentCollection.insertOne({
+                sessionId,
+                userId,
+                email,
+                amount,
+                status,
+                createdAt: new Date(),
+            });
+            return res.status(201).send({ message: "Payment saved successfully" });
+        }
+        
+        res.status(200).send({ message: "Payment already recorded" });
+    } catch (err) {
+        console.error("Failed to save to MongoDB:", err);
+        res.status(500).send({ message: "Server error" });
+    }
+});
+
+
     app.listen(port, () => {
       console.log(`Server running on port ${port}`);
     });
