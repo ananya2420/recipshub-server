@@ -21,6 +21,9 @@ async function run() {
 
     const database = client.db("recipeshub_db");
     const recipeCollection = database.collection("recips"); 
+    const reportCollection = database.collection("reports");
+     const likeCollection = database.collection("likes");
+    
 
     app.get("/", (req, res) => {
       res.send("Server is running!");
@@ -49,13 +52,16 @@ async function run() {
 
             if (page) {
                 const pageNum = parseInt(page) || 1;
-                const limitNum = parseInt(perPage) || 10;
+                const limitNum = parseInt(perPage) || 32;
                 const recipes = await recipeCollection
                     .find(query)
                     .skip((pageNum - 1) * limitNum)
                     .limit(limitNum)
                     .toArray();
                 return res.send(recipes);
+            }
+            if (req.query.featured === "true") {
+             query.isFeatured = true;
             }
 
             const result = await recipeCollection.find(query).toArray();
@@ -78,6 +84,28 @@ async function run() {
             res.status(500).send({ message: "Failed to create recipe" });
         }
     });
+
+
+    // Example Express.js backend route
+// Fix this block in your server.js
+app.delete('/api/recipes/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    // 1. Use 'recipeCollection' (which you defined earlier)
+    // 2. Ensure the ID is a valid MongoDB ObjectId
+    const result = await recipeCollection.deleteOne({ _id: new ObjectId(id) });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).send({ message: "Recipe not found" });
+    }
+    
+    res.status(200).json({ message: "Recipe deleted successfully" });
+  } catch (error) {
+    console.error("Delete error:", error);
+    res.status(500).json({ error: "Failed to delete" });
+  }
+});
+
     
     app.get("/recipe/:id", async (req, res) => {
     try {
@@ -140,18 +168,14 @@ app.post("/api/payments", async (req, res) => {
 
   // Inside your server.js
 app.get("/api/purchases/:userId", async (req, res) => {
+    console.log("DEBUG: Fetching purchases for userId:", req.params.userId);
     const purchaseCollection = client.db("recipeshub_db").collection("purchases");
     const purchases = await purchaseCollection.find({ userId: req.params.userId }).toArray();
+    console.log("DEBUG: Found purchases:", purchases);
     res.send(purchases);
 });
 
-//recipe related apis
 
-    // app.post("/recips", async (req, res) => {
-    //       const recipe=req.body;
-    //       const result=await recipeCollection.insertOne(recipe);
-    //       res.send(result);
-    // })
 
 
 // --- Favorites API Routes ---
@@ -221,7 +245,77 @@ app.post("/api/save-payment", async (req, res) => {
         res.status(500).send({ message: "Server error" });
     }
 });
+    
+    // Get all pending reports
+// Fetch reports
+    app.get("/api/reports", async (req, res) => {
+        try {
+            const reports = await reportCollection.find({ status: "pending" }).toArray();
+            res.send(reports);
+        } catch (err) {
+            res.status(500).send({ message: "Failed to fetch" });
+        }
+    });
 
+
+
+// Remove Recipe
+    app.delete("/api/admin/remove-recipe/:recipeId/:reportId", async (req, res) => {
+        try {
+            await recipeCollection.deleteOne({ _id: new ObjectId(req.params.recipeId) });
+            await reportCollection.updateOne(
+                { _id: new ObjectId(req.params.reportId) }, 
+                { $set: { status: "removed" } }
+            );
+            res.status(200).send({ message: "Success" });
+        } catch (err) {
+            res.status(500).send({ message: "Failed" });
+        }
+    });
+
+// Dismiss Report
+    app.patch("/api/admin/dismiss-report/:reportId", async (req, res) => {
+        try {
+            await reportCollection.updateOne(
+                { _id: new ObjectId(req.params.reportId) }, 
+                { $set: { status: "dismissed" } }
+            );
+            res.send({ message: "Dismissed" });
+        } catch (err) {
+            res.status(500).send({ message: "Failed" });
+        }
+    });
+
+    // Add this to your server.js inside the `run()` function
+app.get("/api/popular-recipes", async (req, res) => {
+    try {
+        const popularRecipes = await likeCollection.aggregate([
+            {
+                // Group by recipeId and count occurrences
+                $group: {
+                    _id: "$recipeId",
+                    likesCount: { $sum: 1 }
+                }
+            },
+            { $sort: { likesCount: -1 } }, // Most liked first
+            { $limit: 4 }, // Limit to top 4
+            {
+                // Join with the original recipe collection to get title/author details
+                $lookup: {
+                    from: "recips", // Ensure this matches your collection name
+                    localField: "_id",
+                    foreignField: "_id",
+                    as: "recipeDetails"
+                }
+            },
+            { $unwind: "$recipeDetails" }
+        ]).toArray();
+
+        res.send(popularRecipes);
+    } catch (err) {
+        res.status(500).send({ message: "Failed to fetch popular recipes" });
+    }
+});
 
     app.listen(port, () => {
       console.log(`Server running on port ${port}`);
@@ -233,5 +327,8 @@ app.post("/api/save-payment", async (req, res) => {
 
 run();
 
-
+//.env
 //git rm --cached .env
+//git add .gitignore
+//git commit -m "chore: stop tracking .env file"
+// git push
