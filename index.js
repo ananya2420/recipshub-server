@@ -28,12 +28,17 @@ async function run() {
 
    app.get("/recips", async (req, res) => {
         try {
-            const { search, page, perPage, userId } = req.query;
+            const { search, page, perPage, userId, category } = req.query;
             const query = {};
 
             if (userId) {
                 query.userId = userId;
             }
+
+            if (category && category !== "undefined") {
+            
+            query.category = { $in: [category] };
+        }
 
             if (search && search !== "undefined") {
                 query.$or = [
@@ -65,8 +70,7 @@ async function run() {
     app.post("/api/recips", async (req, res) => {
         try {
             const newRecipe = req.body;
-            // Ensure fields match your form: name, category, cuisineType, difficultyLevel, 
-            // preparationTime, ingredients, instructions, image, userId
+            
             const result = await recipeCollection.insertOne(newRecipe);
             res.status(201).send({ insertedId: result.insertedId });
         } catch (err) {
@@ -143,11 +147,11 @@ app.get("/api/purchases/:userId", async (req, res) => {
 
 //recipe related apis
 
-    app.post("/recips", async (req, res) => {
-          const recipe=req.body;
-          const result=await recipeCollection.insertOne(recipe);
-          res.send(result);
-    })
+    // app.post("/recips", async (req, res) => {
+    //       const recipe=req.body;
+    //       const result=await recipeCollection.insertOne(recipe);
+    //       res.send(result);
+    // })
 
 
 // --- Favorites API Routes ---
