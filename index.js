@@ -12,6 +12,7 @@ const port = 5000;
 app.use(cors());
 app.use(express.json());
 
+
 const client = new MongoClient(process.env.MONGO_DB_URL);
 
 async function run() {
@@ -23,11 +24,64 @@ async function run() {
     const recipeCollection = database.collection("recips"); 
     const reportCollection = database.collection("reports");
      const likeCollection = database.collection("likes");
-    
+     const purchaseCollection = database.collection("purchases");
+    const favoriteCollection = database.collection("favorites");
+    const paymentCollection = database.collection("payments");
+    const sessionCollection = database.collection("session");
 
     app.get("/", (req, res) => {
       res.send("Server is running!");
     });
+
+    const logger=(req,res,next)=>{
+        console.log('logger logged',req.params);
+        next();
+    }
+
+    const verifyToken=async(req,res,next)=>{
+        console.log('headers',req.headers);
+        const authHeader=req.headers?.authorization;
+        if (!authHeader) {
+        return res.status(401).send({ message: 'unauthorized access' });
+    }
+        const token=authHeader.split(' ')[1]
+        if(!token){
+            return res.status(401).send({message:'unauthorized access'})
+        }
+        const query={token:token}
+        const session=await sessionCollection.findOne(query);
+
+        console.log(session);
+
+        const userId=session.userId;
+        //console.log('user id of the session',userId);
+
+        const userQuery={
+            _id:userId
+        }
+        const user=await usersCollection.findOne(userQuery);
+       console.log('user id of the session',user);
+        next();
+
+    }
+
+    //must be used after verifyToken middleware
+    const verifyUser = async (req, res, next) => {
+        // This assumes verifyToken has already run and attached the session/user info
+        // Adjust the logic below based on how your 'verifyToken' stores the user
+         if (req.user?.role !== 'user') {
+        return res.status(403).send({ message: 'forbidden access' })
+        }
+        next();
+    };
+    
+    // //must be used after verifyToken middleware
+    const verifyAdmin = async (req, res, next) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).send({ message: 'forbidden access' })
+    }
+    next();
+}
 
    app.get("/recips", async (req, res) => {
         try {
@@ -71,9 +125,41 @@ async function run() {
             res.status(500).send("Error fetching data");
         }
     });
+    
+
+    // application related apis
+app.get('/api/applications', verifyToken, verifyUser, async (req, res) => {
+    const query = {};
+    if (req.query.applicantId) {
+        query.applicantId = req.query.applicantId;
+
+        // check whether asking for user information or someone else
+        console.log(req.user, req.query.applicantId)
+        if (req.user._id.toString() !== req.query.applicantId) {
+            return res.status(403).send({ message: 'forbidden access' })
+        }
+
+    }
+    if (req.query.recipeId) {
+        query.recipeId = req.query.recipeId;
+    }
+    const cursor = applicationsCollection.find(query);
+    const result = await cursor.toArray();
+    res.send(result);
+})
+
+app.post('/api/applications', async (req, res) => {
+    const application = req.body;
+    const newApplication = {
+        ...application,
+        createdAt: new Date()
+    }
+    const result = await applicationsCollection.insertOne(newApplication);
+    res.send(result);
+})
 
 
-    app.post("/api/recips", async (req, res) => {
+    app.post("/api/recips",verifyToken, async (req, res) => {
         try {
             const newRecipe = req.body;
             
@@ -88,7 +174,7 @@ async function run() {
 
     // Example Express.js backend route
 // Fix this block in your server.js
-app.delete('/api/recipes/:id', async (req, res) => {
+app.delete('/api/recipes/:id', logger,verifyToken,verifyAdmin, async (req, res) => {
   const { id } = req.params;
   try {
     // 1. Use 'recipeCollection' (which you defined earlier)
@@ -326,6 +412,10 @@ app.get("/api/popular-recipes", async (req, res) => {
 }
 
 run();
+
+
+
+
 
 //.env
 //git rm --cached .env
