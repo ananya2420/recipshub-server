@@ -55,6 +55,7 @@ const verifyToken = async (req, res, next) => {
         console.log("Token NOT found in session collection!");
         return res.status(401).send({ message: 'Invalid session' });
     }
+    next();
     
 }
 
@@ -195,7 +196,8 @@ app.post('/api/applications', async (req, res) => {
     app.post("/api/recips",verifyToken, async (req, res) => {
         try {
             const newRecipe = req.body;
-            
+            console.log(newRecipe);
+
             const result = await recipeCollection.insertOne(newRecipe);
             res.status(201).send({ insertedId: result.insertedId });
         } catch (err) {
@@ -370,15 +372,43 @@ app.get("/purchases", async (req, res) => {
 });
 
   
+// app.get("/api/purchases/:userId", async (req, res) => {
+//     console.log("DEBUG: Fetching purchases for userId:", req.params.userId);
+//     const purchaseCollection = client.db("recipeshub_db").collection("purchases");
+//     const purchases = await purchaseCollection.find({ userId: req.params.userId }).toArray();
+//     console.log("DEBUG: Found purchases:", purchases);
+//     res.send(purchases);
+// });
+
 app.get("/api/purchases/:userId", async (req, res) => {
-    console.log("DEBUG: Fetching purchases for userId:", req.params.userId);
-    const purchaseCollection = client.db("recipeshub_db").collection("purchases");
-    const purchases = await purchaseCollection.find({ userId: req.params.userId }).toArray();
-    console.log("DEBUG: Found purchases:", purchases);
-    res.send(purchases);
+    try {
+        const { userId } = req.params;
+        const purchaseCollection = client.db("recipeshub_db").collection("purchases");
+        const purchases = await purchaseCollection.find({ userId: userId }).toArray();
+        res.status(200).json(purchases);
+    } catch (err) {
+        res.status(500).json({ message: "Server error" });
+    }
 });
 
 
+
+// Add this to your server.js
+// Add these to server.js inside your run() function
+app.get("/api/purchases/:userId", async (req, res) => {
+    const data = await client.db("recipeshub_db").collection("purchases").find({ userId: req.params.userId }).toArray();
+    res.json(data);
+});
+
+app.get("/api/favorites/:userId", async (req, res) => {
+    const data = await client.db("recipeshub_db").collection("favorites").find({ userId: req.params.userId }).toArray();
+    res.json(data);
+});
+
+app.get("/api/likes/:userId", async (req, res) => {
+    const data = await client.db("recipeshub_db").collection("likes").find({ userId: req.params.userId }).toArray();
+    res.json(data);
+});
 
 
 // --- Favorites API Routes ---
@@ -565,3 +595,4 @@ run();
 //git add .gitignore
 //git commit -m "chore: stop tracking .env file"
 // git push
+//git add index.js
