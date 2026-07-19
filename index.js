@@ -55,6 +55,7 @@ const verifyToken = async (req, res, next) => {
         console.log("Token NOT found in session collection!");
         return res.status(401).send({ message: 'Invalid session' });
     }
+    
 }
 
     //must be used after verifyToken middleware
@@ -512,37 +513,26 @@ app.post("/api/save-payment", async (req, res) => {
         }
     });
 
-    // Add this to your server.js inside the `run()` function
-app.get("/api/popular-recipes", async (req, res) => {
-    try {
-        const popularRecipes = await likeCollection.aggregate([
-            {
-                // Group by recipeId and count occurrences
-                $group: {
-                    _id: "$recipeId",
-                    likesCount: { $sum: 1 }
-                }
-            },
-            { $sort: { likesCount: -1 } }, // Most liked first
-            { $limit: 4 }, // Limit to top 4
-            {
-                // Join with the original recipe collection to get title/author details
-                $lookup: {
-                    from: "recips", // Ensure this matches your collection name
-                    localField: "_id",
-                    foreignField: "_id",
-                    as: "recipeDetails"
-                }
-            },
-            { $unwind: "$recipeDetails" }
-        ]).toArray();
 
-        res.send(popularRecipes);
+
+ // Add this to your server.js inside the run() function
+app.get("/api/recipes", async (req, res) => {
+    try {
+        // Query the 'recips' collection directly
+        // Sort by 'likesCount' descending (-1) to get most liked
+        // Limit to 4 results
+        const recipes = await recipeCollection
+            .find({ likesCount: { $exists: true } }) // Ensure the field exists
+            .sort({ likesCount: -1 })
+            .limit(4)
+            .toArray();
+
+        res.status(200).send(recipes);
     } catch (err) {
+        console.error("Error fetching popular recipes:", err);
         res.status(500).send({ message: "Failed to fetch popular recipes" });
     }
 });
-
 
 
 app.get("/likes", async (req, res) => {
