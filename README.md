@@ -64,6 +64,4 @@ WHAT TO SUBMIT Admin Email Admin Password Live Site Link Github Repository (Serv
 
 Live Link: https://recipshub-server.vercel.app
 
-Admin Email: admin@gourab.com
 
-Admin Password: Gourab1234
